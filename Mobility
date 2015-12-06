@@ -1,0 +1,359 @@
+//Mecanum Wheel Controller r3
+//7/05/2015
+//by:Jonivan Artates
+//www.JonivanArtates.com
+//Omnibot r1
+
+// Inputs from Android Amarino
+// outputs PWM to ESCs
+// 2 HC-05s: debug on //  Serial, Amarino input on //  Serial2
+
+//Libraries
+#include <MeetAndroid.h>  //library for Amarino App
+MeetAndroid meetAndroid;  //initialize meet Android
+#include <Servo.h>
+Servo myservoFL;  // create servo object to control a servo
+Servo myservoFR;  // create servo object to control a servo
+Servo myservoRL;  // create servo object to control a servo
+Servo myservoRR;  // create servo object to control a servo
+
+
+//variables
+unsigned long wait;
+float data[2];
+float d0;
+float d1;
+float d2;
+float test;
+float fix;
+int fixcase;
+int counter;
+float timer1;
+float timer2;
+
+//inputs from controller
+float x; //right to left 100:-100
+float y; //forward to back 100:-100
+float z; //CW to CCW 100:-100
+
+//coordinate conversion
+unsigned long a; //to hold x^2 for r
+unsigned long b; //to hold y^2 for r
+unsigned long r; //radius
+float f;
+double theta; //angle to x-axis
+float c; //rotation scalar
+int Case; //debug value
+
+//Outputs:
+//vectors for respective wheels
+float FL; //vector for front left wheel
+float FR; //vector for front right wheel
+float RL; //vector for rear left wheel
+float RR; //vector for rear right wheel
+
+//PWM values to ESC
+int FLval;
+int FRval;
+int RLval;
+int RRval;
+
+void setup(){  
+  pinMode(13, OUTPUT);
+  Serial1.begin(9600);     //bluetooth input, Android (Amarino App)
+                                                                                                                                      //Serial.begin(9600); //bluetooth output, Debug (Tera Term)
+  fixcase = 0;
+  meetAndroid.registerFunction(floatValues, 'A'); // float array
+  d0 = 0;
+  d1 = 0;
+  d2 = 0;
+  counter = 0;
+  /*
+  A0; analog input for x,  called out in main loop
+  A1; analog input for y,  called out in main loop
+  A2; analog input for z,  called out in main loop
+  */
+  myservoFL.attach(3);  // attaches the servo on pin 9 to the servo object
+  myservoFR.attach(6);  // attaches the servo on pin 9 to the servo object
+  myservoRL.attach(9);  // attaches the servo on pin 9 to the servo object
+  myservoRR.attach(11);  // attaches the servo on pin 9 to the servo object
+
+}
+
+//Get data from Amarino:
+void floatValues(byte flag, byte numOfValues)
+{
+  // create an array where all event values should be stored
+  // the number of values attached to this event is given by
+  // a parameter(numOfValues)
+  float data[numOfValues];
+ 
+  // call the library function to fill the array with values
+  meetAndroid.getFloatValues(data);
+   
+  // access the values
+  for (int i=0; i<numOfValues;i++) {
+    meetAndroid.send(data[i]);
+  }
+  d0 = data[0];
+  d1 = data[1];
+  d2 = data[2];
+}
+
+
+
+
+//MAIN LOOP
+void loop() {
+
+  
+                                                                                                                                  //DEBUG  
+                                                                                                                                  
+                                                                                                                                  //delay(400);                   
+                                                                                                                                 // timer1 = millis();  //debug value for process timer
+                                                                                                                                  
+
+
+//Get data from Android
+meetAndroid.receive(); // you need to keep this in your loop() to receive events
+
+ //initial calibration for ESC
+if (d0 == 0){
+   //  Serial.println("Awaiting connection. ");
+   myservoFL.write(90);  // attaches the servo on pin 9 to the servo object
+   myservoFR.write(90);  // attaches the servo on pin 9 to the servo object
+   myservoRL.write(90);  // attaches the servo on pin 9 to the servo object
+   myservoRR.write(90);  // attaches the servo on pin 9 to the servo object
+                                                                                                                                   //   delay (500);
+ }
+
+
+//Once Calibrated: 
+if (d0 != 0) {
+
+//store initial Android orientation angle for reference
+if (fixcase == 0){
+  fix = d0;
+  fixcase = 1;
+}
+
+                                                                                                                                    //debug fix: uncomment to debug
+                                                                                                                                   
+                                                                                                                                      //Serial.print("fix = ");
+                                                                                                                                      //Serial.println(fix);
+                                                                                                                                   // */
+
+
+//Connection Lost EMERGENCY STOP
+if (test == d0){
+  counter = counter + 1;
+  if (counter >= 250){
+   x = 0;
+   y = 0;
+   z = 0;
+   fixcase = 0;
+   digitalWrite(13, LOW);    // turn the LED off by making the voltage LOW
+                                                                                                                                       //Serial.println("                                                  SAFE MODE");
+   }
+}
+
+//Connection Established: process incoming values
+ else {
+  digitalWrite(13, HIGH);   // turn the LED on (HIGH is the voltage level)
+  counter = 0;
+  x = d1;
+  x = map(x,60,-60,-100,100);
+  x = constrain(x,-100,100);
+  y = d2;
+  y = map(y,60,-60,-100,100);
+  y = constrain(y,-100,100);
+  z = d0 - fix;
+  if (z <= -180) {
+    z = z +360;
+  }
+  if (z >= 180) {
+    z = z - 360;
+  }
+  z = map(z,-60,60,-100,100);
+  z = constrain(z,-100,100);
+                                                                                                                          
+                                                                                                                                  /*Using Potentiometers:
+                                                                                                                                  x = analogRead(A0);
+                                                                                                                                  x = map(x,0,1023,-100,100);
+                                                                                                                                  y = analogRead(A1);
+                                                                                                                                  y = map(y,0,1023,-100,100);
+                                                                                                                                  z = analogRead(A2);
+                                                                                                                                  z = map(z,0,1023,-100,100);
+                                                                                                                                  */
+      }
+
+                                                                                                                                  //debug counter  
+                                                                                                                                  /* 
+                                                                                                                                    Serial.print("counter =  ");
+                                                                                                                                    Serial.println(counter);
+                                                                                                                                  */
+
+
+test = d0;
+
+
+
+                                                                                                                                  //debug data inputs
+                                                                                                                                  //Print data array to Serial
+                                                                                                                                  
+                                                                                                                                    //Serial.println("data ");
+                                                                                                                                    //Serial.print(d0);
+                                                                                                                                    //Serial.print(", ");
+                                                                                                                                    //Serial.print(d1);
+                                                                                                                                    //Serial.print(", ");
+                                                                                                                                    //Serial.print(d2);
+                                                                                                                                    //Serial.print(", ");
+                                                                                                                                  
+
+
+                                                                                                                                  // debug: Mecanum Mixing:
+                                                                                                                                  /*
+                                                                                                                                    Serial.print("fix = ");
+                                                                                                                                    Serial.println(fix);
+                                                                                                                                    Serial.print("x = ");
+                                                                                                                                    Serial.println(x);
+                                                                                                                                    Serial.print("y = ");
+                                                                                                                                    Serial.println(y);
+                                                                                                                                    Serial.print("z = ");
+                                                                                                                                    Serial.println(z);
+                                                                                                                                  */
+
+  a = (x * x);
+  b = (y * y);
+
+                                                                                                                                  
+                                                                                                                                  //debug a & b  
+                                                                                                                                  /*
+                                                                                                                                    Serial.print("a = ");
+                                                                                                                                    Serial.println(a);
+                                                                                                                                    Serial.print("b = ");
+                                                                                                                                    Serial.println(b);  
+                                                                                                                                  */
+
+
+  r = sqrt(a+b);
+  if (r > 100){
+    r = 100;
+  }
+  
+                                                                                                                                  //debug r 
+                                                                                                                                  /*
+                                                                                                                                    Serial.print("r = ");
+                                                                                                                                    Serial.println(r);
+                                                                                                                                  */
+
+
+//Mecanum mixer:
+f = (y/x);
+
+                                                                                                                                  //debug f 
+                                                                                                                                  /*
+                                                                                                                                    Serial.print("f = ");
+                                                                                                                                    Serial.println(f);
+                                                                                                                                  */
+
+//special axis cases for theta
+ if (x == 0){
+    if (y > 0){                    //positive y-axis
+      theta = PI/2;
+      Case = 1;
+    }
+    else if (y < 0){               //negative y-axis
+      theta = -PI/2;
+      Case = 2;
+    }
+    else if (y == 0){              //origin
+      theta = 0;
+      Case = 3;
+    }
+  }
+ else if (y == 0){                
+    if (x > 0){                    //positive x-axis
+      theta = 0;
+      Case = 4;
+    }
+    else if (x < 0){               //negative x-axis
+      theta = PI;
+      Case = 5;
+    }
+  }
+ else{                             //general, quadrant 1
+  theta = atan(y / x);
+  Case = 6;
+   if (x < 0){                     //quadrant 2&3 modifier
+     theta = (PI + theta);
+     Case = 7; 
+    }
+   if (x > 0 && y < 0){            //quadrant 4 modifier
+     theta = theta + (2*PI);
+     Case = 8;      
+    }
+ }
+
+                                                                                                                                  //debug case and theta
+                                                                                                                                  /*
+                                                                                                                                    Serial.print("theta = ");
+                                                                                                                                    Serial.println(theta);
+                                                                                                                                    Serial.print("Case = ");
+                                                                                                                                    Serial.println(Case);
+                                                                                                                                  */
+
+//Equations for each wheel:
+  FL = r * cos(theta - (PI / 4)) + z;
+  FR = r * sin(theta - (PI / 4)) - z;
+  RL = r * sin(theta - (PI / 4)) + z;
+  RR = r * cos(theta - (PI / 4)) - z;
+
+//Normalize vectors:
+  FL = min(FL, 70.71);
+  FL = max(FL, -70.71);
+  FL = (FL/70.71)*100;
+  FR = min(FR, 70.71);
+  FR = max(FR, -70.71);
+  FR = (FR/70.71)*100;
+  RL = min(RL, 70.71);
+  RL = max(RL, -70.71);
+  RL = (RL/70.71)*100;
+  RR = min(RR, 70.71);
+  RR = max(RR, -70.71);
+  RR = (RR/70.71)*100;
+
+                                                                                                                                  //debug mixer values
+                                                                                                                                  /*
+                                                                                                                                     Serial.print("FL = ");
+                                                                                                                                     Serial.print(FL);
+                                                                                                                                     Serial.print("   FR = ");
+                                                                                                                                     Serial.println(FR);
+                                                                                                                                     Serial.print("RL = ");
+                                                                                                                                     Serial.print(RL);
+                                                                                                                                     Serial.print("   RR = ");
+                                                                                                                                     Serial.println(RR);
+                                                                                                                                  */
+
+//Convert to PWM 
+ FLval = map(FL,-100,100,30,150); 
+ FRval = map(FR,-100,100,30,150);
+ RLval = map(RL,-100,100,30,150);
+ RRval = map(RR,-100,100,30,150);
+
+//Write to GPIO
+ myservoFL.write(FLval);  // attaches the servo on pin 9 to the servo object
+ myservoFR.write(FRval);  // attaches the servo on pin 9 to the servo object
+ myservoRL.write(RLval);  // attaches the servo on pin 9 to the servo object
+ myservoRR.write(RRval);  // attaches the servo on pin 9 to the servo object
+                                                                                                                                  
+                                                                                                                                  //timing: uncomment to debug
+                                                                                                                                  /*
+                                                                                                                                  timer2 = millis() - timer1;
+                                                                                                                                  Serial.print("loop time =  ");
+                                                                                                                                  Serial.println(timer2);
+                                                                                                                                  Serial.println();            //Spacer line
+                                                                                                                                  */
+ 
+ }
+}
